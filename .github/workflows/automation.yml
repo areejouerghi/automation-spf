@@ -1,0 +1,79 @@
+name: Cypress Tests
+on: [push]
+jobs:
+  cypress-generate-report:
+    runs-on: ubuntu-latest
+    name: Generate Cypress Report
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Cypress run
+        uses: cypress-io/github-action@v5.0.5
+
+      # Generate a report from the test results
+      - name: Cypress Generate Report
+        run: sh ./scripts/generate-report.sh
+
+      # Save test results to a directory so we can upload them as an artifact
+      - name: Save Test Results
+        run: mv mochawesome-report test-results
+      
+      # Upload test results to GitHub as artifacts
+      - name: Archive Test Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: test-results/
+      
+      # Upload test videos to GitHub as artifacts
+      - name: Archive Test Videos
+        uses: actions/upload-artifact@v3
+        with:
+          name: cypress-videos
+          path: cypress/videos/
+
+      # Upload test screenshots to GitHub as artifacts
+      - name: Archive Test Screenshots
+        uses: actions/upload-artifact@v3
+        with:
+          name: cypress-screenshots
+          path: cypress/screenshots/
+  
+  cypress-publish-report:  
+    runs-on: ubuntu-latest
+    name: Deploy on Github Pages
+    needs: cypress-generate-report
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      
+    - name: Download Test Results
+      uses: actions/download-artifact@v3
+      with:
+        name: test-results
+
+    - name: Delete unneeded files
+      run: sh ./scripts/keep-reports-in-repository.sh
+    
+    - name: Prepare website
+      run: sh ./scripts/prepare-gh-page.sh
+
+    - name: List files
+      run: ls -la
+
+    - name: Deploy 🚀
+      uses: JamesIves/github-pages-deploy-action@v4
+      with:
+        token: ${{ secrets.ACCESS_TOKEN }}
+        branch: gh-pages
+        folder: .
+
+  cypress-share-report:  
+    runs-on: ubuntu-latest
+    name: Sharing via Email
+    needs: cypress-publish-report
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Cypress Generate Report
+        run: sh ./scripts/share-report.sh
